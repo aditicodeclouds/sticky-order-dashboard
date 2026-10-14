@@ -1,0 +1,1 @@
+<?php require __DIR__.'/includes/bootstrap.php'; require_login(); verify_csrf(); $id=(int)($_POST['brand_id']??0);foreach(user_brands() as $b){if((int)$b['id']===$id){$_SESSION['brand_id']=$id;flash('success','Brand switched to '.$b['name'].'.');redirect('dashboard.php');}}flash('error','You do not have access to that brand.');redirect('dashboard.php');
