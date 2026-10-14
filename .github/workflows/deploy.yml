@@ -38,7 +38,7 @@ jobs:
         run: |
           set -eu
 
-          # Trim stray spaces / line breaks that sneak in when a secret is pasted.
+          # Trim  stray spaces / line breaks that sneak in when a secret is pasted.
           DIR="$(printf '%s' "$RAW_DIR" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 
           if [ -z "$HOST" ] || [ -z "$FTP_USER" ] || [ -z "$FTP_PASS" ] || [ -z "$DIR" ]; then
