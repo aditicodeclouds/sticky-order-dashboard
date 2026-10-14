@@ -1,10 +1,15 @@
-name: Deploy to mybrandbloom.com    (SFTP)
+name: Deploy to mybrandbloom.com (SFTP)
 
 on:
   push:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only list what would be uploaded (nothing is changed)"
+        type: boolean
+        default: false
 
 concurrency:
   group: production-deploy
@@ -26,28 +31,68 @@ jobs:
       - name: Upload files via SFTP
         env:
           HOST: ${{ secrets.FTP_SERVER }}
-          USER: ${{ secrets.FTP_USERNAME }}
-          PASS: ${{ secrets.FTP_PASSWORD }}
-          DIR: ${{ secrets.FTP_SERVER_DIR }}
-          DRY_RUN: "false"
+          FTP_USER: ${{ secrets.FTP_USERNAME }}
+          FTP_PASS: ${{ secrets.FTP_PASSWORD }}
+          RAW_DIR: ${{ secrets.FTP_SERVER_DIR }}
+          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
         run: |
           set -eu
 
-          if [ -z "$HOST" ] || [ -z "$USER" ] || [ -z "$PASS" ] || [ -z "$DIR" ]; then
+          # Trim stray spaces / line breaks that sneak in when a secret is pasted.
+          DIR="$(printf '%s' "$RAW_DIR" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+
+          if [ -z "$HOST" ] || [ -z "$FTP_USER" ] || [ -z "$FTP_PASS" ] || [ -z "$DIR" ]; then
             echo "One or more required GitHub secrets are missing."
             exit 1
           fi
 
-          lftp -u "$USER","$PASS" "sftp://$HOST:22" -e "
-            set cmd:fail-exit yes;
-            set sftp:auto-confirm yes;
-            set net:timeout 20;
-            set net:max-retries 2;
-            mirror --reverse --verbose --parallel=4 \
-              $( [ "$DRY_RUN" = "true" ] && printf '%s' '--dry-run' ) \
-              --exclude-glob .git \
-              --exclude-glob .github \
-              --exclude-glob README.md \
-              ./ \"$DIR\";
-            bye
-          "
+          # A quote in the folder name creates a folder literally called  "public_html  .
+          case "$DIR" in
+            *\"*|*\'*)
+              echo "FTP_SERVER_DIR must not contain quote characters."
+              exit 1
+              ;;
+          esac
+
+          # Never deploy into the site root: this app's index.php would overwrite the
+          # WordPress index.php that lives there.
+          case "${DIR%/}" in
+            public_html|/public_html|*/public_html)
+              echo "FTP_SERVER_DIR points at public_html itself. Use a subfolder, e.g. public_html/sticky-order-dashboard"
+              exit 1
+              ;;
+          esac
+
+          lftp -u "$FTP_USER","$FTP_PASS" "sftp://$HOST:22" <<EOF
+          set cmd:fail-exit yes
+          set sftp:auto-confirm yes
+          set net:timeout 20
+          set net:max-retries 2
+          mirror --reverse --verbose --parallel=4 $DRY_RUN \
+            --exclude-glob .git/ \
+            --exclude-glob .github/ \
+            --exclude-glob .gitignore \
+            --exclude-glob README.md \
+            --exclude-glob sql/ \
+            --exclude-glob tests/ \
+            ./ "$DIR"
+          bye
+          EOF
+
+      - name: Check the files arrived
+        if: ${{ !inputs.dry_run }}
+        env:
+          HOST: ${{ secrets.FTP_SERVER }}
+          FTP_USER: ${{ secrets.FTP_USERNAME }}
+          FTP_PASS: ${{ secrets.FTP_PASSWORD }}
+          RAW_DIR: ${{ secrets.FTP_SERVER_DIR }}
+        run: |
+          set -eu
+          DIR="$(printf '%s' "$RAW_DIR" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+
+          lftp -u "$FTP_USER","$FTP_PASS" "sftp://$HOST:22" <<EOF
+          set cmd:fail-exit yes
+          set sftp:auto-confirm yes
+          cls -1 "$DIR/index.php"
+          bye
+          EOF
