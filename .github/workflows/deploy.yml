@@ -1,4 +1,4 @@
-name: Deploy to mybrandbloom.com (SFTP)
+name: Deploy to mybrandbloom.com    (SFTP)
 
 on:
   push:
