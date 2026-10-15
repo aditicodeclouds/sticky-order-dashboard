@@ -57,7 +57,11 @@ The campaign IDs are normalized without spaces and sorted descending numerically
 ## AJAX reports and large result sets
 - Dashboard page rendering does not load either table report. Each table fetches independently when its own **Apply** button is clicked; changing fields saves the field selection and reloads only that report. The summary loads separately over AJAX.
 - A per-report loading overlay is shown during report fetches and field updates.
+<<<<<<< HEAD
 - Sticky.io order-view results can be capped at 500 detailed orders. The integration attempts to fetch remaining order IDs in batches; `sticky.max_pages` in `config/config.php` is the maximum number of follow-up batches and `sticky.order_ids_batch_size` defaults to 400. A timeout of at least 120 seconds is used for each Sticky.io call.
+=======
+- Sticky.io `order_find` may return up to 500 full order records along with `order_ids` and/or `remaining_order_ids`. The dashboard collects those IDs, keeps the full records already returned, then calls the sibling `/order_view` endpoint with `{"order_id":[...]} ` batches of up to 100 IDs. It merges results by `order_id` and fails the report clearly if any requested detail is missing. `sticky.max_pages` in `config/config.php` limits the number of follow-up batches (default 100), and `sticky.order_ids_batch_size` defaults to 100 (maximum 100). Each API request allows at least 120 seconds. This batch behavior should be verified against the target Sticky.io account.
+>>>>>>> f6d30d4 (gg)
 - If your installed Sticky.io endpoint does not support `order_ids` with `order_find`, the dashboard displays a clear error rather than silently counting missing orders; ask Sticky.io support which supported method returns `order_view` details for a supplied list of IDs.
 
 ## Order classification rules
